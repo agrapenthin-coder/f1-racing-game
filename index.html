@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Formula Apex</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;overflow:hidden;background:#08111b;font-family:Inter,system-ui,sans-serif;color:#fff} canvas{display:block;width:100vw;height:100vh} #hud{position:fixed;inset:0;pointer-events:none} #speed{position:absolute;left:28px;bottom:24px;font-weight:900;font-size:32px;text-shadow:0 3px 12px #000} #speed small{font-size:13px;color:#bfd8ff} #lap{position:absolute;right:28px;top:22px;text-align:right;font-weight:800;text-shadow:0 2px 8px #000} #controls{position:absolute;left:28px;top:22px;padding:10px 13px;border:1px solid #ffffff35;border-radius:10px;background:#06101bb8;font-size:12px} #finish{position:absolute;inset:0;display:none;place-items:center;background:#02070d99}.card{padding:30px;text-align:center;border:1px solid #ffffff30;border-radius:18px;background:#07131fe8}.card h1{margin:0 0 8px}.card button{pointer-events:auto;border:0;border-radius:8px;padding:10px 18px;background:#ff315d;color:#fff;font-weight:800;cursor:pointer}
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <div id="controls">W / ↑ accelerate<br>A D / ← → steer<br>S / ↓ brake</div>
+  <div id="lap">LAP <span id="lapNum">1</span>/3<br><span id="time">00:00.000</span></div>
+  <div id="speed"><span id="kmh">0</span> <small>KM/H</small></div>
+  <div id="finish"><div class="card"><h1 id="finishTitle">Race Complete</h1><div id="finishTime"></div><br><button id="restart">Race Again</button></div></div>
+</div>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}addEventListener('resize',resize);resize();
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowup','arrowdown','arrowleft','arrowright',' ','w','a','s','d'].includes(e.key.toLowerCase()))e.preventDefault()});addEventListener('keyup',e=>keys[e.key.toLoweredCase()]=false); // fixed below
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let car={x:0,speed:0,angle:0},track=0,lap=1,start=performance.now(),finished=false;
+const laps=3,trackLength=9000;
+function roadAt(z){return Math.sin(z/900)*.72+Math.sin(z/330)*.22}
+function project(relX, z, y=0){const horizon=H*.36,scale=1/(z*.0012+.12);const bend=(roadAt(track+z)-roadAt(track))*W*.19;return{x:W/2+(relX-car.x)*W*.32*scale+bend,y:horizon+(1-scale*.72)*H*.52-y*scale*.8,scale}}
+function poly(p,fill){ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);for(let i=1;i<p.length;i++)ctx.lineTo(p[i].x,p[i].y);ctx.closePath();ctx.fillStyle=fill;ctx.fill()}
+function draw(){
+ ctx.fillStyle='#87bde8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#9e9f82';ctx.fillRect(0,H*.36,W,H*.64);
+ const horizon=H*.36;
+ for(let z=1600;z>=20;z-=45){const rel=z/1600;const y=horizon+(1-rel)*H*.64;ctx.fillStyle=Math.floor(z/45)%2?'#205b34':'#286d3e';ctx.fillRect(0,y,W,H*.1)}
+ // perspective track
+ for(let z=1800;z>20;z-=35){const band=Math.floor((track+z)/260)%2;const near=z-35,far=z;function pts(side,ZZ){const p=project(side*2.8,ZZ);return p}const p1=project(-3.25,near),p2=project(3.25,near),p3=project(3.25,far),p4=project(-3.25,far);poly([p1,p2,p3,p4],band?'#4a4b4c':'#555657');
+  for(const side of [-1,1]){const a=project(side*3.25,near),b=project(side*3.55,near),c=project(side*3.55,far),d=project(side*3.25,far);poly([a,b,c,d],Math.floor((track+z)/180)%2?(side>0?'#fff':'#e31837'):(side>0?'#e31837':'#fff'))}
+ }
+ // grandstand / distance trees
+ for(let i=0;i<18;i++){const z=300+i*90,side=i%2?1:-1,p=project(side*5.5,z);ctx.fillStyle=i%3?'#163921':'#1f4b2b';ctx.beginPath();ctx.arc(p.x,p.y,p.scale*14,0,Math.PI*2);ctx.fill()}
+ drawCar();
+}
+function drawCar(){const cx=W/2-car.x*W*.12,cy=H*.84,s=Math.min(W,H)/650;
+ ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
+ // shadow
+ ctx.fillStyle='#0008';ctx.beginPath();ctx.ellipse(0,22,92,30,0,0,Math.PI*2);ctx.fill();
+ // wheels
+ ctx.fillStyle='#090a0b';for(const x of [-78,78])for(const y of [-25,58]){ctx.beginPath();ctx.ellipse(x,y,18,31,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#34383d';ctx.lineWidth=4;ctx.stroke()}
+ // body lower and sidepods
+ ctx.beginPath();ctx.moveTo(-70,-45);ctx.quadraticCurveTo(-76,-10,-65,70);ctx.lineTo(65,70);ctx.quadraticCurveTo(76,-10,70,-45);ctx.closePath();ctx.fillStyle='#d71920';ctx.fill();
+ ctx.fillStyle='#f5f5f5';ctx.beginPath();ctx.moveTo(-58,-43);ctx.lineTo(-25,-72);ctx.lineTo(-18,62);ctx.lineTo(-57,70);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#111821';ctx.beginPath();ctx.moveTo(-18,-58);ctx.quadraticCurveTo(0,-72,18,-58);ctx.lineTo(24,-10);ctx.lineTo(-24,-10);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#b20f18';ctx.beginPath();ctx.moveTo(-24,-18);ctx.quadraticCurveTo(0,8,24,-18);ctx.lineTo(33,54);ctx.quadraticCurveTo(0,68,-33,54);ctx.closePath();ctx.fill();
+ // cockpit
+ ctx.fillStyle='#07090c';ctx.beginPath();ctx.ellipse(0,-46,25,34,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#142b43';ctx.beginPath();ctx.ellipse(0,-50,18,25,0,0,Math.PI*2);ctx.fill();
+ // rear/ front wings
+ ctx.fillStyle='#111';ctx.fillRect(-96,-75,192,10);ctx.fillRect(-74,80,148,10);ctx.fillStyle='#e21a2b';ctx.fillRect(-82,77,164,5);
+ // halo
+ ctx.strokeStyle='#111';ctx.lineWidth=7;ctx.beginPath();ctx.arc(0,-48,30,-.2,Math.PI+.2);ctx.stroke();
+ ctx.restore();
+}
+function update(dt){
+ const accel=(keys.w||keys.arrowup)?1:0,brake=(keys.s||keys.arrowdown)?1:0;
+ if(accel)car.speed+=dt*95;if(brake)car.speed-=dt*150;car.speed-=dt*(12+car.speed*.018);car.speed=Math.max(0,Math.min(320,car.speed));
+ const steer=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);car.angle+=steer*dt*(.8+car.speed/220);car.x+=steer*dt*(.7+car.speed/180)*1.1-car.angle*dt*.12;car.x=Math.max(-2.2,Math.min(2.2,car.x));
+ track+=car.speed*dt*1.15;if(track>=trackLength){track-=trackLength;lap++;if(lap>laps){finished=true;document.getElementById('finish').style.display='grid';document.getElementById('finishTime').textContent='Time: '+document.getElementById('time').textContent}}
+ document.getElementById('kmh').textContent=Math.round(car.speed);document.getElementById('lapNum').textContent=Math.min(lap,laps);if(!finished){const ms=performance.now()-start,mm=Math.floor(ms/60000),ss=Math.floor(ms/1000)%60,xx=Math.floor(ms%1000);document.getElementById('time').textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0')+'.'+String(xx).padStart(3,'0')}}
+let last=performance.now();function loop(now){const dt=Math.min(.032,(now-last)/1000);last=now;if(!finished)update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+document.getElementById('restart').onclick=()=>location.reload();
+</script>
+</body>
+</html>
