@@ -1,12 +1,7 @@
 # Formula Apex 3D
 
-A self-contained, Formula-style 3D browser racing game built with Three.js.
+This version uses Three.js to render an actual 3D scene: polygonal car body, wheels, cockpit, curved track, kerbs, trees, lighting, shadows, fog, and a chase camera.
 
-## Controls
+Play: https://agrapenthin-coder.github.io/f1-racing-game/
 
-- **W / Up Arrow** — accelerate
-- **S / Down Arrow** — brake
-- **A / Left Arrow** — steer left
-- **D / Right Arrow** — steer right
-
-Complete three laps. Play at the [GitHub Pages link](https://agrapenthin-coder.github.io/f1-racing-game/).
+Controls: W/A/S/D or arrow keys.
